@@ -1,0 +1,4 @@
+lex example.1
+gcc -g lex.yy.c -o example.out
+
+./example.out input class ex

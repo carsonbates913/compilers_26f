@@ -1,0 +1,4 @@
+Priti: 60, 60, 60, 60
+Captain: 60 50
+Ironman: 40 45 50 55
+QueenRamonda: 55 50 50 50
