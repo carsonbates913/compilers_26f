@@ -1,5 +1,7 @@
 #include<stdio.h>
 
+int func(int);
+
 int read(){
         int x;
         scanf("%d", &x);
@@ -8,4 +10,10 @@ int read(){
 
 void print(int x){
         printf("%d\n", x);
+}
+
+int main(){
+        int i = func(5);
+        printf("Return value of test: %d\n", i);
+        return 0;
 }
