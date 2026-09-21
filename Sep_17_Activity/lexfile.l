@@ -14,7 +14,7 @@
             int val = atoi(yytext);
             running_sum += val;
           }
-[ |,|:] { }
+[ ,:] { }
 [\n]  {
         scores[idx] = running_sum;
         printf("%s: %d \n", names[idx], scores[idx]);

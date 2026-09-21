@@ -382,7 +382,7 @@ static const YY_CHAR yy_ec[256] =
 
         5,    5,    5,    5,    5,    5,    5,    5,    5,    5,
         5,    5,    5,    5,    5,    5,    5,    5,    5,    5,
-        5,    5,    1,    3,    1,    1,    1,    1,    1,    1,
+        5,    5,    1,    1,    1,    1,    1,    1,    1,    1,
         1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
         1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
         1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
@@ -442,8 +442,8 @@ int yy_flex_debug = 0;
 #define YY_MORE_ADJ 0
 #define YY_RESTORE_YY_MORE_OFFSET
 char *yytext;
-#line 1 "lexfile.c"
-#line 2 "lexfile.c"
+#line 1 "lexfile.l"
+#line 2 "lexfile.l"
   #include<stdio.h>
   #include<string.h>
   char* names[100];
@@ -668,7 +668,7 @@ YY_DECL
 		}
 
 	{
-#line 9 "lexfile.c"
+#line 9 "lexfile.l"
 
 #line 673 "lex.yy.c"
 
@@ -729,14 +729,14 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 10 "lexfile.c"
+#line 10 "lexfile.l"
 {
                 names[idx] = strdup(yytext);
               }
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 13 "lexfile.c"
+#line 13 "lexfile.l"
 {
             int val = atoi(yytext);
             running_sum += val;
@@ -744,13 +744,13 @@ YY_RULE_SETUP
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 17 "lexfile.c"
+#line 17 "lexfile.l"
 { }
 	YY_BREAK
 case 4:
 /* rule 4 can match eol */
 YY_RULE_SETUP
-#line 18 "lexfile.c"
+#line 18 "lexfile.l"
 {
         scores[idx] = running_sum;
         printf("%s: %d \n", names[idx], scores[idx]);
@@ -760,7 +760,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 24 "lexfile.c"
+#line 24 "lexfile.l"
 ECHO;
 	YY_BREAK
 #line 766 "lex.yy.c"
@@ -1768,7 +1768,7 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 24 "lexfile.c"
+#line 24 "lexfile.l"
 
 int yywrap(){
   return(1);
