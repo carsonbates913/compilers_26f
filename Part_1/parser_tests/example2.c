@@ -1,7 +1,7 @@
 extern void print(int);
 extern int read();
 
-int func(int k){
+int func(){
 
   int a;
   int result;

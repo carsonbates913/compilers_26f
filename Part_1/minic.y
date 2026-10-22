@@ -44,6 +44,7 @@ printextern : EXTERN VOID PRINT '(' INT ')' ';' 		{$$ = createExtern(strdup("pri
 readextern : EXTERN INT READ '(' ')' ';'						{$$ = createExtern(strdup("read"));}
 
 function : INT ID '(' INT ID ')' block							{$$ = createFunc($2, createDecl($5), $7);}
+				 | INT ID '(' ')' block											{$$ = createFunc($2, NULL, $5);}
 
 whilestatement : WHILE condition block							{$$ = createWhile($2, $3);}
 
@@ -82,10 +83,10 @@ assignmentstatement : ID '=' term ';'								{$$ = createAsgn(createVar($1), $3)
 
 unaryexpression : '-' term 													{$$ = createUExpr($2, uminus);}
 
-functionCall : ID '(' ')' 													{$$ = createCall($1); free($1);}
-						 | ID '(' term ')'											{$$ = createCall($1); free($1);}
-						 | PRINT '(' term ')'										{$$ = createCall(strdup("print")); }
-						 | READ '(' ')'													{$$ = createCall(strdup("read"));}
+functionCall : ID '(' ')' 													{$$ = createCall($1, NULL); free($1);}
+						 | ID '(' term ')'											{$$ = createCall($1, $3); free($1);}
+						 | PRINT '(' term ')'										{$$ = createCall(strdup("print"), $3); }
+						 | READ '(' ')'													{$$ = createCall(strdup("read"), NULL);}
 
 binaryexpression : '(' binaryexpressioncore ')'			{$$ = $2;}
 								 | binaryexpressioncore							{$$ = $1;}
