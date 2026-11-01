@@ -396,7 +396,7 @@ void walkBasicblocks(LLVMValueRef function){
 		bool isChanged = true;
 
 		while(isChanged){
-			bool a = constantPropagation(function)
+			bool a = constantPropagation(function);
 			bool b = constantFolding(function);
 			isChanged = a | b;
 		}
