@@ -1,0 +1,61 @@
+target triple = "x86_64-pc-linux-gnu"
+
+declare i32 @read()
+
+declare void @print(i32 %0)
+
+define i32 @func(i32 %0) {
+entryBB:
+  %a = alloca i32, align 4
+  %i = alloca i32, align 4
+  %n = alloca i32, align 4
+  %sum = alloca i32, align 4
+  %return = alloca i32, align 4
+  store i32 %0, ptr %n, align 4
+  store i32 0, ptr %i, align 4
+  store i32 0, ptr %sum, align 4
+  %1 = load i32, ptr %n, align 4
+  %2 = icmp sle i32 %1, 0
+  br i1 %2, label %trueBB, label %falseBB
+
+retBB:                                            ; preds = %endBB3, %trueBB
+  %3 = load i32, ptr %return, align 4
+  ret i32 %3
+
+trueBB:                                           ; preds = %entryBB
+  store i32 0, ptr %return, align 4
+  br label %retBB
+
+falseBB:                                          ; preds = %entryBB
+  br label %condBB
+
+condBB:                                           ; preds = %trueBB1, %falseBB
+  %4 = load i32, ptr %i, align 4
+  %5 = load i32, ptr %n, align 4
+  %6 = icmp slt i32 %4, %5
+  br i1 %6, label %trueBB1, label %falseBB2
+
+trueBB1:                                          ; preds = %condBB
+  %7 = call i32 @read()
+  store i32 %7, ptr %a, align 4
+  %8 = load i32, ptr %sum, align 4
+  %9 = load i32, ptr %a, align 4
+  %10 = add i32 %8, %9
+  store i32 %10, ptr %sum, align 4
+  %11 = load i32, ptr %i, align 4
+  %12 = add i32 %11, 1
+  store i32 %12, ptr %i, align 4
+  br label %condBB
+
+falseBB2:                                         ; preds = %condBB
+  br label %endBB3
+
+endBB3:                                           ; preds = %falseBB2
+  %13 = load i32, ptr %sum, align 4
+  store i32 %13, ptr %return, align 4
+  br label %retBB
+}
+doing 
+doing done 
+
+1

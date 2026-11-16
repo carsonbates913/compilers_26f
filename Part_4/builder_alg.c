@@ -14,22 +14,9 @@
 static bool has_return = false;
 static std::string function_name;
 static int num_params;
-static std::map<std::string, std::vector<std::vector<astNode>> var_names;
-static std::map<std::string, std::vector<astNode> end_result;
 
-void collapse_map(){
-  for( std::string key_name : var_names.getKeys()){
-    std::vector<std::vector<astNode>> vec_value = var_names.get(key_name);
-    for(int i = 1; i < vec_value.length + 1; i++){
-      std::string new_name = key_name + i
-      std::vector<astNode> new_vector = vec_value[i-1];
-      for( astNode x : new_vector){
-        // change name of x to new_name;
-      }
-      end_result.push(new_name, new_vector);
-    }
-  }
-}
+static std::map<std::string, std::vector<std::vector<astNode>> var_names;
+static std::map<std::string, std::vector<std::string> var_map;
 
 static std::map<std::string, LLVMValueRef> var_map;
 static LLVMValueRef func;
@@ -43,6 +30,115 @@ static LLVMBasicBlockRef retBB;
 LLVMBasicBlockRef genIRStmt(astNode* node, LLVMBuilderRef builder, LLVMBasicBlockRef startBB);
 LLVMValueRef genIRExpr(astNode* node, LLVMBuilderRef builder);
 void deleteUnreachableBlocks(LLVMValueRef func);
+
+void preprocess(astNode* node){
+  switch(node -> type){
+    case ast_var: {
+      std::vector<std::string> x = var_map.at(node->var.name);
+      node->var.name = var_map.at(node->var.name).back();
+      break;
+    }
+    case ast_cnst: {
+      break;
+    }
+    case ast_prog: {
+      break;
+    }
+    case ast_func: {
+      break;
+    }
+    case ast_rexpr: {
+      preprocess(node->rexpr.lhs);
+      preprocess(node->rexpr.rsh);
+      break;
+    }
+    case ast_uexpr: {
+      preprocess(node->uexpr.expr);
+      break;
+    }
+    case ast_bexpr: {
+      preprocess(node->bexpr.lhs);
+      preprocess(node->bexpr.rhs);
+      break;
+    }
+    case ast_extern: {
+      break;
+    }
+    case ast_stmt: {
+
+      astStmt* stmt = &(node->stmt);
+
+      switch(stmt -> type){
+        case ast_call: {
+          if(stmt->call.param != NULL){
+            preprocess(stmt->call.param);
+          }
+          break;
+        }
+        case ast_ret: {
+          preprocess(stmt->ret.expr);
+          break;
+        }
+        case ast_block: {
+          for (const auto& [name, vector] : var_map) {
+              vector.push_back(vector.back());
+          }
+          vector<astNode*> slist = *(stmt->block.stmt_list);
+          vector<astNode*>::iterator it = slist.begin();
+          while (it != slist.end()){
+            preprocess(*it);
+            it++;
+          }
+          for (const auto& [name, vector] : var_map) {
+              if(vector.size() > 0){
+                vector.pop_back();
+              }
+          }
+          break;
+        }
+        case ast_while: {
+          preprocess(stmt->whilen.cond);
+          preprocess(stmt->whilen.body);
+          break;
+        }
+        case ast_if: {
+          preprocess(stmt->ifn.cond);
+          preprocess(stmt->ifn.if_body);
+          if(stmt->ifn.else_body != NULL) {
+            preprocess(stmt->ifn.else_body);
+          }
+          break;
+        }
+        case ast_asgn: {
+          preprocess(stmt->asgn.rhs);
+          preprocess(stmt->asgn.lhs);
+          break;
+        }
+        case ast_decl: {
+          if (var_map.contains(node->decl.name)) {
+            std::vector<std::string> curr = var_map.at(node->decl.name);
+            std::string old = curr.back();
+            curr.pop_back();
+            curr.push_back(curr.at(0) + curr.size());
+          }else{
+            std::vector<std::string> new_vector;
+            new_vector.push_back(node->decl.name);
+            var_map.insert({node->decl.name, new_vector});
+          }
+          break;
+        }
+        default: {
+          break;
+        }
+      }
+      break;
+    }
+    default: {
+      break;
+    }
+  }
+}
+
 
 LLVMModuleRef build_LLVM_IR(astNode* root_node) {
 	//Creating a module 
@@ -97,7 +193,7 @@ LLVMModuleRef build_LLVM_IR(astNode* root_node) {
 
 	//Creating store instructions to make local copy of parameters
   if(num_params == 1){
-      LLVMBuildStore(builder, LLVMGetParam(func, 0), var_map[function_node->func.param->stmt.decl.name]);
+      LLVMBuildStore(builder, LLVMGetParam(func, 0), var_map.get(function_node->func.param->stmt.decl.name));
   }
 
   retBB = LLVMAppendBasicBlock(func, "retBB");
@@ -135,7 +231,7 @@ LLVMBasicBlockRef genIRStmt(astNode* node, LLVMBuilderRef builder, LLVMBasicBloc
       LLVMValueRef result = genIRExpr(node->stmt.asgn.rhs, builder);
       astNode* var_node = node->stmt.asgn.lhs;
 
-      LLVMBuildStore(builder, result, var_map[var_node->var.name]);
+      LLVMBuildStore(builder, result, var_map.get(var_node->var.name));
       return startBB;
     }
     case ast_call: {
@@ -210,7 +306,7 @@ LLVMValueRef genIRExpr(astNode* node, LLVMBuilderRef builder){
       break;
     }
     case ast_var: {
-      return LLVMBuildLoad2(builder, LLVMInt32Type(), var_map[node->var.name], "");
+      return LLVMBuildLoad2(builder, LLVMInt32Type(), var_map.get(node->var.name), "");
       break;
     }
     case ast_uexpr: {
@@ -309,3 +405,20 @@ void deleteUnreachableBlocks(LLVMValueRef func){
     }
   }
 }
+
+
+/*
+void collapse_map(){
+  for( std::string key_name : var_names.getKeys()){
+    std::vector<std::vector<astNode>> vec_value = var_names.get(key_name);
+    for(int i = 1; i < vec_value.length + 1; i++){
+      std::string new_name = key_name + i
+      std::vector<astNode> new_vector = vec_value[i-1];
+      for( astNode x : new_vector){
+        // change name of x to new_name;
+      }
+      end_result.push(new_name, new_vector);
+    }
+  }
+}
+  */
