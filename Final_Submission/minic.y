@@ -4,9 +4,6 @@
 #include <string.h>
 #include <vector>
 #include "ast.h"
-#include "semantic_analysis.h"
-#include "builder_alg.h"
-#include "assembly_generator.h"
 extern int yylex();
 extern int yylex_destroy();
 extern int yywrap();
@@ -25,7 +22,6 @@ astNode *root;
 	vector<astNode*> *svec;
 }
 
-// You need to add types of tokens and non-terminals
 %token <idname> ID
 %token <ival> NUM
 %token INT VOID GT LT EQ GE LE NEQ IF WHILE ELSE EXTERN RETURN PRINT READ
@@ -124,40 +120,6 @@ term : ID 																					{$$ = createVar($1); free($1);}
 		 | '(' NUM ')'																	{$$ = createCnst($2);}
 
 %%
-int main(int argc, char** argv){
-	if (argc >= 2){
-  	yyin = fopen(argv[1], "r");
-	}
-	yyparse(); // Will set the root
-	printf("doing \n");
-	if (root == NULL) {
-			printf("Parsing failed or root was not created\n");
-			return 1;
-	}
-	int sem_flag = semantic_analysis(root);
-	printf("doing done \n");
-
-	preprocess(root);
-	LLVMModuleRef mod = build_LLVM_IR(root);
-	printf("\n%d\n", sem_flag);
-
-	// Assembly code generator: ./minic.out <input.c> <output.s>
-	if (argc >= 3) {
-		code_generation(mod, argv[2]);
-	}
-	LLVMDisposeModule(mod);
-
-	// Cleanup	
-	freeNode(root);
-
-	if (yyin != stdin)
-		fclose(yyin);
-	
-	yylex_destroy();
-
-	
-	return 0;
-}
 
 void yyerror(const char *){
 	fprintf(stderr, "Syntax error\n");

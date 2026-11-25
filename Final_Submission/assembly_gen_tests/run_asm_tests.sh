@@ -2,7 +2,7 @@
 # Runs every test in assembly_gen_tests/ through minic.out and checks the
 # generated 32-bit x86 assembly against a clang-compiled reference.
 #
-# For each test it saves (in asm_results/):
+# For each test it saves (in assembly_gen_tests/asm_results/):
 #   name.s         - assembly produced by your compiler
 #   name.log       - full stdout/stderr of minic.out
 #   name.link_err  - assembler/linker errors (if any)
@@ -14,7 +14,7 @@
 # assembled, linked and run inside an i386 Linux Docker container
 # (image "minic-i386", built automatically the first time).
 #
-# Usage: ./run_asm_tests.sh [-v] [test_dir]
+# Usage: assembly_gen_tests/run_asm_tests.sh [-v] [test_dir]
 #   -v        print the generated assembly for each test
 #   test_dir  directory with the *.c tests (default: assembly_gen_tests)
 #
@@ -33,13 +33,14 @@ NC='\033[0m'
 VERBOSE=0
 if [ "$1" == "-v" ]; then VERBOSE=1; shift; fi
 TEST_DIR="${1:-assembly_gen_tests}"
-OUT_DIR="asm_results"
+OUT_DIR="$TEST_DIR/asm_results"
 N_VALUES="${N_VALUES:-0 1 4 10}"
 # Values fed to read() (max_n / sum_n call read() n times)
 INPUT="3 7 1 9 4 2 8 6 5 10 12 11 15 14 13 20 18 17 16 19"
 IMAGE="minic-i386"
 
-cd "$(dirname "$0")" || exit 1
+# Run from the compiler directory (the parent of this script's folder)
+cd "$(dirname "$0")/.." || exit 1
 
 # Run a command with a time limit (macOS has no `timeout`)
 run_limited() { perl -e 'alarm shift; exec @ARGV' 5 "$@"; }
@@ -55,11 +56,12 @@ if ! docker image inspect "$IMAGE" > /dev/null 2>&1; then
         || { echo -e "${RED}Failed to build $IMAGE image.${NC}"; exit 1; }
 fi
 
-make clean > /dev/null && make > "$OUT_DIR.build.log" 2>&1
+BUILD_LOG="$(mktemp)"
+make clean > /dev/null && make > "$BUILD_LOG" 2>&1
 if [ ! -f "./minic.out" ]; then
-    echo -e "${RED}Build failed:${NC}"; tail -20 "$OUT_DIR.build.log"; exit 1
+    echo -e "${RED}Build failed:${NC}"; tail -20 "$BUILD_LOG"; exit 1
 fi
-rm -f "$OUT_DIR.build.log"
+rm -f "$BUILD_LOG"
 
 rm -rf "$OUT_DIR"; mkdir -p "$OUT_DIR"
 

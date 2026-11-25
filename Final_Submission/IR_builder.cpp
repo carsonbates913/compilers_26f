@@ -125,7 +125,7 @@ void preprocess(astNode* node){
           if (var_names.contains(stmt->decl.name)) {
             std::vector<std::string>& curr = var_names.at(stmt->decl.name);
 
-            curr.pop_back();
+            if (!curr.empty()) curr.pop_back();
             std::string new_name = std::string(stmt->decl.name) + std::to_string(var_counter.at(stmt->decl.name));
             var_set.insert(new_name);
             
@@ -245,7 +245,7 @@ LLVMBasicBlockRef genIRStmt(astNode* node, LLVMBuilderRef builder, LLVMBasicBloc
         LLVMValueRef result = genIRExpr(node->stmt.call.param, builder);
         LLVMBuildCall2(builder, ret_print, func_print, &result, 1, "");
       }else{
-        int num_params = (node->func.param != NULL) ? 1 : 0;
+        int num_params = (node->stmt.call.param != NULL) ? 1 : 0;
         if(num_params == 1){
           LLVMValueRef result = genIRExpr(node->stmt.call.param, builder);
           LLVMBuildCall2(builder, func_type, func, &result, 1, "");
