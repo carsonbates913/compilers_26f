@@ -5,4 +5,6 @@
 
 LLVMModuleRef build_LLVM_IR(astNode* root_node);
 
+void preprocess(astNode* node);
+
 #endif

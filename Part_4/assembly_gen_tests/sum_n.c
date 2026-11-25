@@ -8,13 +8,11 @@ int func(int n){
 	i = 0;
 	sum = 0;
 	
-	if (n <= 0) return 0;
-	else
-		while (i < n){ 
-			a = read();
-			sum = sum + a;
-			i = i + 1;
-		}
+	while (i < n){ 
+		a = read();
+		sum = sum + a;
+		i = i + 1;
+	}
 	
 	return sum;
 }

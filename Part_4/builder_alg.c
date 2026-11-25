@@ -11,15 +11,13 @@
 #include <set>
 #include <string>
 
-static bool has_return = false;
-static std::string function_name;
-static int num_params;
-
-static std::map<std::string, std::vector<std::vector<astNode>> var_names;
-static std::map<std::string, std::vector<std::string> var_map;
-
+static std::map<std::string, std::vector<std::string>> var_names;
+static std::map<std::string, int> var_counter;
+static std::set<std::string> var_set;
 static std::map<std::string, LLVMValueRef> var_map;
+
 static LLVMValueRef func;
+static LLVMTypeRef func_type;
 static LLVMValueRef func_read;
 static LLVMValueRef func_print;
 static LLVMTypeRef ret_read;
@@ -34,22 +32,29 @@ void deleteUnreachableBlocks(LLVMValueRef func);
 void preprocess(astNode* node){
   switch(node -> type){
     case ast_var: {
-      std::vector<std::string> x = var_map.at(node->var.name);
-      node->var.name = var_map.at(node->var.name).back();
+      std::string& new_name = var_names.at(node->var.name).back();
+      char* old = node->var.name;
+      node->var.name = strdup(new_name.c_str());
+      free(old);
       break;
     }
     case ast_cnst: {
       break;
     }
     case ast_prog: {
+      preprocess(node->prog.func);
       break;
     }
     case ast_func: {
+      if(node->func.param != NULL) {
+        preprocess(node->func.param);
+      }
+      preprocess(node->func.body);
       break;
     }
     case ast_rexpr: {
       preprocess(node->rexpr.lhs);
-      preprocess(node->rexpr.rsh);
+      preprocess(node->rexpr.rhs);
       break;
     }
     case ast_uexpr: {
@@ -80,8 +85,10 @@ void preprocess(astNode* node){
           break;
         }
         case ast_block: {
-          for (const auto& [name, vector] : var_map) {
+          for (auto& [name, vector] : var_names) {
+            if(vector.size() > 0){
               vector.push_back(vector.back());
+            }
           }
           vector<astNode*> slist = *(stmt->block.stmt_list);
           vector<astNode*>::iterator it = slist.begin();
@@ -89,7 +96,7 @@ void preprocess(astNode* node){
             preprocess(*it);
             it++;
           }
-          for (const auto& [name, vector] : var_map) {
+          for (auto& [name, vector] : var_names) {
               if(vector.size() > 0){
                 vector.pop_back();
               }
@@ -115,15 +122,21 @@ void preprocess(astNode* node){
           break;
         }
         case ast_decl: {
-          if (var_map.contains(node->decl.name)) {
-            std::vector<std::string> curr = var_map.at(node->decl.name);
-            std::string old = curr.back();
+          if (var_names.contains(stmt->decl.name)) {
+            std::vector<std::string>& curr = var_names.at(stmt->decl.name);
+
             curr.pop_back();
-            curr.push_back(curr.at(0) + curr.size());
+            std::string new_name = std::string(stmt->decl.name) + std::to_string(var_counter.at(stmt->decl.name));
+            var_set.insert(new_name);
+            
+            var_counter[stmt->decl.name] = var_counter.at(stmt->decl.name) + 1;
+            curr.push_back(new_name);
           }else{
             std::vector<std::string> new_vector;
-            new_vector.push_back(node->decl.name);
-            var_map.insert({node->decl.name, new_vector});
+            new_vector.push_back(stmt->decl.name);
+            var_names.insert({stmt->decl.name, new_vector});
+            var_counter.insert({stmt->decl.name, 2});
+            var_set.insert(stmt->decl.name);
           }
           break;
         }
@@ -160,7 +173,7 @@ LLVMModuleRef build_LLVM_IR(astNode* root_node) {
   astNode* function_node = root_node->prog.func;
   int num_params = (function_node->func.param != NULL) ? 1 : 0;
   LLVMTypeRef param_types[] = {LLVMInt32Type()};
-  LLVMTypeRef func_type = LLVMFunctionType(LLVMInt32Type(), param_types, num_params, 0);
+  func_type = LLVMFunctionType(LLVMInt32Type(), param_types, num_params, 0);
   func = LLVMAddFunction(mod, function_node->func.name, func_type);
 
 	//All instructions need to be created using a builder. The builder specifies
@@ -168,12 +181,8 @@ LLVMModuleRef build_LLVM_IR(astNode* root_node) {
   LLVMBuilderRef builder = LLVMCreateBuilder();
 
   //Creating a basic block
-  LLVMBasicBlockRef entryBB = LLVMAppendBasicBlock(func, "");
+  LLVMBasicBlockRef entryBB = LLVMAppendBasicBlock(func, "entryBB");
 
-  // Create a set with names of all parameters and local variables (strongly recommend using C++ strings for names).
-  ///
-
-  // This positions the builder in the end of the first basicblock. There are other position functions in Core.h
   LLVMPositionBuilderAtEnd(builder, entryBB);
 
   // Initialize var_map to a new map: 
@@ -181,11 +190,9 @@ LLVMModuleRef build_LLVM_IR(astNode* root_node) {
   //Generate an alloc statement 
   //Add name, LLVMvalueRef of alloc statement generated above to var_map  
 
-  for(auto& x : var_map){
-      LLVMValueRef y = LLVMBuildAlloca(builder, LLVMInt32Type(), x.first.c_str()); 
-	    LLVMSetAlignment(y, 4);
-      x.second = y;
-  }
+  for (auto& item : var_set) {
+      var_map.insert({item, LLVMBuildAlloca(builder, LLVMInt32Type(), item.data())});
+    }
 
 	//Generate an alloc instruction for the return value and keep the LLVMValueRef, ret_ref, of this instruction available everywhere in your program
 	ret_ref = LLVMBuildAlloca(builder, LLVMInt32Type(), "return"); 
@@ -193,7 +200,7 @@ LLVMModuleRef build_LLVM_IR(astNode* root_node) {
 
 	//Creating store instructions to make local copy of parameters
   if(num_params == 1){
-      LLVMBuildStore(builder, LLVMGetParam(func, 0), var_map.get(function_node->func.param->stmt.decl.name));
+      LLVMBuildStore(builder, LLVMGetParam(func, 0), var_map[function_node->func.param->stmt.decl.name]);
   }
 
   retBB = LLVMAppendBasicBlock(func, "retBB");
@@ -208,16 +215,14 @@ LLVMModuleRef build_LLVM_IR(astNode* root_node) {
     LLVMBuildBr(builder, retBB);
   }
 
-  /// BFS to identify Basic Blocks not reached
   deleteUnreachableBlocks(func);
 
-	//Writing out the LLVM IR file and to stderr
-	LLVMDumpModule(mod); //stderr
-	LLVMPrintModuleToFile (mod, "test.ll", NULL); //to file here
+	LLVMDumpModule(mod);
+	LLVMPrintModuleToFile (mod, "test.ll", NULL);
 
-	//Cleanup
   LLVMDisposeBuilder(builder);
-	LLVMDisposeModule(mod);
+
+  return mod;
 }
 
 LLVMBasicBlockRef genIRStmt(astNode* node, LLVMBuilderRef builder, LLVMBasicBlockRef startBB){
@@ -231,13 +236,23 @@ LLVMBasicBlockRef genIRStmt(astNode* node, LLVMBuilderRef builder, LLVMBasicBloc
       LLVMValueRef result = genIRExpr(node->stmt.asgn.rhs, builder);
       astNode* var_node = node->stmt.asgn.lhs;
 
-      LLVMBuildStore(builder, result, var_map.get(var_node->var.name));
+      LLVMBuildStore(builder, result, var_map[var_node->var.name]);
       return startBB;
     }
     case ast_call: {
       LLVMPositionBuilderAtEnd(builder, startBB);
-      LLVMValueRef result = genIRExpr(node->stmt.call.param, builder);
-      LLVMBuildCall2(builder, ret_print, func_print, &result, 1, "");
+      if(strcmp(node->stmt.call.name, "print") == 0){
+        LLVMValueRef result = genIRExpr(node->stmt.call.param, builder);
+        LLVMBuildCall2(builder, ret_print, func_print, &result, 1, "");
+      }else{
+        int num_params = (node->func.param != NULL) ? 1 : 0;
+        if(num_params == 1){
+          LLVMValueRef result = genIRExpr(node->stmt.call.param, builder);
+          LLVMBuildCall2(builder, func_type, func, &result, 1, "");
+        }else{
+          LLVMBuildCall2(builder, func_type, func, {}, 0, "");
+        }
+      }
       return startBB;
     }
     case ast_while: {
@@ -284,6 +299,7 @@ LLVMBasicBlockRef genIRStmt(astNode* node, LLVMBuilderRef builder, LLVMBasicBloc
       return endBB;
     }
     case ast_block: {
+
       LLVMBasicBlockRef prevBB = startBB;
       vector<astNode*> slist = *(node->stmt.block.stmt_list);
       vector<astNode*>::iterator it = slist.begin();
@@ -306,7 +322,7 @@ LLVMValueRef genIRExpr(astNode* node, LLVMBuilderRef builder){
       break;
     }
     case ast_var: {
-      return LLVMBuildLoad2(builder, LLVMInt32Type(), var_map.get(node->var.name), "");
+      return LLVMBuildLoad2(builder, LLVMInt32Type(), var_map[node->var.name], "");
       break;
     }
     case ast_uexpr: {
@@ -330,6 +346,10 @@ LLVMValueRef genIRExpr(astNode* node, LLVMBuilderRef builder){
         }
         case mul: {
           calc_ref = LLVMBuildMul(builder, lhs_ref, rhs_ref, "");
+          break;
+        }
+        case divide: {
+          calc_ref = LLVMBuildSDiv(builder, lhs_ref, rhs_ref, "");
           break;
         }
         default: {
@@ -381,7 +401,17 @@ LLVMValueRef genIRExpr(astNode* node, LLVMBuilderRef builder){
       break;
     }
     case ast_stmt: {
-      return LLVMBuildCall2(builder, ret_read, func_read, NULL, 0, "");
+      if(strcmp(node->stmt.call.name, "read") == 0){
+        return LLVMBuildCall2(builder, ret_read, func_read, NULL, 0, "");
+      }else{
+        int num_params = (node->func.param != NULL) ? 1 : 0;
+        if(num_params == 1){
+          LLVMValueRef result = genIRExpr(node->stmt.call.param, builder);
+          return LLVMBuildCall2(builder, func_type, func, &result, 1, "");
+        }else{
+          return LLVMBuildCall2(builder, func_type, func, {}, 0, "");
+        }
+      }
     }
     default: {
       return NULL;
@@ -406,19 +436,16 @@ void deleteUnreachableBlocks(LLVMValueRef func){
   }
 }
 
-
-/*
-void collapse_map(){
-  for( std::string key_name : var_names.getKeys()){
-    std::vector<std::vector<astNode>> vec_value = var_names.get(key_name);
-    for(int i = 1; i < vec_value.length + 1; i++){
-      std::string new_name = key_name + i
-      std::vector<astNode> new_vector = vec_value[i-1];
-      for( astNode x : new_vector){
-        // change name of x to new_name;
-      }
-      end_result.push(new_name, new_vector);
+  /*
+  void print_set(const std::set<std::string>& s) {
+    printf("{");
+    bool first = true;
+    for (const auto& item : s) {
+        if (!first) {
+            printf(", ");
+        }
+        printf("%s", item.c_str());
+        first = false;
     }
-  }
-}
-  */
+    printf("}\n");
+}*/
